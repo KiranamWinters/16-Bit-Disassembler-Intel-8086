@@ -1,0 +1,20 @@
+100010 0 0 00 011 001
+
+000 -> al
+001 cl
+010 bl
+011 dl
+
+
+01 -> [ax] + 8-bit
+10 -> [ax] + 16-bit
+11 -> [ax]
+00 -> [rax] - > 64 bit
+[eax] - 32bit
+
+[ax] + offset
+
+TODO LIST:
+
+~ ( ) make get_REG take 8bits instead of 3
+~ ( ) calulate mod
