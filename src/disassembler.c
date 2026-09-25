@@ -5,12 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-
+#include <stdbool.h>
 //REGISTER LOOKUP TABLE
 const char* REG[] = {
     //W: 0 | 8-Bit Registers
-    "al",   //000 
-    "cl",   //001 
+    "al",   //000
+    "cl",   //001
     "dl",   //010
     "bl",   //011
     "ah",   //100
@@ -37,7 +37,7 @@ const char* SEGMENT_REGISTER[] = {
     "ds"
 };
 
-const char* get_reg(uint8 src, uint8 offset, uint8 w){
+const char* get_reg(uint8 src, uint8 offset, bool w){
     uint8 w_offset = (w) ? 8: 0;
     return REG[GET_REG(src, offset) + w_offset];
 }
@@ -45,7 +45,7 @@ const char* get_reg(uint8 src, uint8 offset, uint8 w){
 char* get_reg_or_memory(uint8 *src, size_t index, uint8 offset, uint8 w){
     char* buffer = malloc(sizeof(char) * 15);
 
-    switch (GET_MOD(src[index+1], 0)) {
+    switch (GET_MOD(src[index + 1], 0)) {
         case(0b00) :{
             switch(GET_RM(src[index+1], offset))  {
                 case(0b000):{strcpy(buffer,"[bx + si]") ;}          break;
@@ -163,22 +163,51 @@ void disassemble(BinFile* file){
 
                 i += mod_based_increment(GET_MOD(bin[i+1],0), GET_RM(bin[i+1], 5));
             }   break;
-
-            //INSTRUCTION(MOV): MEMORY/ACCUMULATOR TO ACCUMULATOR/MEMORY  
-            case(0b101000):{
-                if(!GET_BIT(bin[i], 6)){
-                    printf("%s %s, [%d]\n",get_opcode(bin[i]),"ax",(bin [i+2] << 8)|bin[i+1]);
-                }else{
-                    printf("%s [%d], %s\n",get_opcode(bin[i]),bin[i+2] << 8 | bin[i+1],"ax");
-                }
-                i = i+3;
-            }   break;
             
             //INSTRUCTION(MOV): IMMEDIATE TO REGISTER/MEMORY
             case(0b110001):{
                 //TO BE DONE
-                i = i+2;
+                uint16 data_immediate;
+                const char* instruction_size;
+                uint8 w_bit = GET_BIT(bin[i], 7);
+                const char* dest = get_reg_or_memory(bin,i,5,w_bit);
+                uint8 mod_rm_inc = mod_based_increment(GET_MOD(bin[i+1],0), GET_RM(bin[i+1], 5));
+                
+                if(w_bit){
+                    instruction_size = "word";
+                    data_immediate = (bin[i+mod_rm_inc+1] << 8) | bin[i+mod_rm_inc];
+                }else{
+                    instruction_size = "byte";
+                    data_immediate = bin[i+mod_rm_inc];
+                }
+
+                printf("%s %s %s, %x\n",get_opcode(bin[i]),instruction_size,dest,data_immediate);
+                i = (w_bit) ? (i + mod_rm_inc + 2) : (i + mod_rm_inc + 1);
             }   break;
+
+            
+            //INSTRUCTION(MOV): MEMORY/ACCUMULATOR TO ACCUMULATOR/MEMORY  
+            case(0b101000):{
+                //Memory to ACCUMULATOR
+                if(GET_BIT(bin[i], 6) == 0){
+                    if(GET_BIT(bin[i],7) == 0){
+                      printf("%s %s, [0x%X]\n",get_opcode(bin[i]),"al",(bin [i+2] << 8)|bin[i+1]);
+                    }else{
+                      printf("%s %s, [0x%X]\n",get_opcode(bin[i]),"ax",(bin [i+2] << 8)|bin[i+1]);
+                    }
+                }
+                //ACCUMULATOR to Memory
+                else{
+                    if(GET_BIT(bin[i],7) == 0){
+                      printf("%s [0x%X], %s\n",get_opcode(bin[i]),bin[i+2] << 8 | bin[i+1],"al");
+
+                    }else{
+                      printf("%s [0x%X], %s\n",get_opcode(bin[i]),bin[i+2] << 8 | bin[i+1],"ax");
+                    }
+                } 
+                i = i+3;
+            }   break;
+            
 
             //INSTRUCTION(MOV): SEGMENT_REGISTER
             case(0b100011):{
